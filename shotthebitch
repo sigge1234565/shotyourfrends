@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CSGO-inspirerat browser-spel</title>
+<style>
+  body {
+    margin: 0;
+    background: #121212;
+    color: white;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    background: #222;
+    margin: auto;
+    border: 2px solid #555;
+  }
+  #score {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    font-size: 24px;
+    color: #0f0;
+    user-select: none;
+  }
+  #timer {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    font-size: 24px;
+    color: #f00;
+    user-select: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="score">Poäng: 0</div>
+<div id="timer">Tid kvar: 60</div>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const scoreDisplay = document.getElementById('score');
+  const timerDisplay = document.getElementById('timer');
+
+  const player = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    radius: 20,
+    speed: 4,
+    angle: 0,
+  };
+
+  const keys = {};
+  window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+  window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+  let mouseX = 0;
+  let mouseY = 0;
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouseX = e.clientX - rect.left;
+    mouseY = e.clientY - rect.top;
+  });
+
+  // Skott
+  const bullets = [];
+  canvas.addEventListener('click', () => {
+    const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+    bullets.push({
+      x: player.x + Math.cos(angle) * player.radius,
+      y: player.y + Math.sin(angle) * player.radius,
+      dx: Math.cos(angle) * 10,
+      dy: Math.sin(angle) * 10,
+      radius: 5,
+    });
+  });
+
+  // Mål
+  const targets = [];
+  const maxTargets = 5;
+
+  function spawnTarget() {
+    const padding = 50;
+    const target = {
+      x: Math.random() * (canvas.width - 2 * padding) + padding,
+      y: Math.random() * (canvas.height - 2 * padding) + padding,
+      radius: 20,
+    };
+    targets.push(target);
+  }
+  for(let i=0; i<maxTargets; i++) spawnTarget();
+
+  let score = 0;
+  let timeLeft = 60;
+
+  function startTimer() {
+    const timerInterval = setInterval(() => {
+      timeLeft--;
+      timerDisplay.textContent = "Tid kvar: " + timeLeft;
+
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        alert("Tiden är ute! Din poäng: " + score);
+        location.reload(); // Ladda om sidan för att starta om spelet
+      }
+    }, 1000);
+  }
+
+  function update() {
+    if(keys['w'] && player.y - player.radius > 0) player.y -= player.speed;
+    if(keys['s'] && player.y + player.radius < canvas.height) player.y += player.speed;
+    if(keys['a'] && player.x - player.radius > 0) player.x -= player.speed;
+    if(keys['d'] && player.x + player.radius < canvas.width) player.x += player.speed;
+
+    player.angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+
+    for(let i = bullets.length -1; i>=0; i--) {
+      let b = bullets[i];
+      b.x += b.dx;
+      b.y += b.dy;
+
+      if(b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+        bullets.splice(i,1);
+        continue;
+      }
+
+      for(let j = targets.length -1; j>=0; j--) {
+        const t = targets[j];
+        const dx = b.x - t.x;
+        const dy = b.y - t.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if(dist < b.radius + t.radius) {
+          targets.splice(j,1);
+          bullets.splice(i,1);
+          score += 10;
+          scoreDisplay.textContent = 'Poäng: ' + score;
+          spawnTarget();
+          break;
+        }
+      }
+    }
+  }
+
+  function drawPlayer() {
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.angle);
+    ctx.fillStyle = '#007acc';
+    ctx.beginPath();
+    ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#005f99';
+    ctx.fillRect(0, -5, player.radius + 15, 10);
+    ctx.restore();
+  }
+
+  function drawBullets() {
+    ctx.fillStyle = '#ffdd00';
+    bullets.forEach(b => {
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2);
+      ctx.fill();
+    });
+  }
+
+  function drawTargets() {
+    ctx.fillStyle = '#cc0000';
+    targets.forEach(t => {
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, t.radius, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = '#770000';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    });
+  }
+
+  function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    update();
+    drawTargets();
+    drawBullets();
+    drawPlayer();
+    requestAnimationFrame(loop);
+  }
+
+  // Starta spelet
+  startTimer();
+  loop();
+</script>
+
+</body>
+</html>
